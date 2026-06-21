@@ -1,0 +1,102 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  display: flex;
+  align-items: center;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-md;
+  margin-bottom: $spacing-sm;
+  box-shadow: $shadow-card;
+  transition: all $transition-fast;
+
+  &:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+}
+
+.iconWrap {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: $radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.iconText {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+}
+
+.content {
+  flex: 1;
+  margin-left: $spacing-md;
+  min-width: 0;
+}
+
+.name {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  margin-top: $spacing-xs;
+}
+
+.size, .time {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.dot {
+  margin: 0 $spacing-xs;
+  color: $color-text-tertiary;
+  font-size: $font-size-xs;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-sm;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.statDot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+}
+
+.statText {
+  font-size: 22rpx;
+  color: $color-text-tertiary;
+}
+
+.arrow {
+  margin-left: $spacing-sm;
+  flex-shrink: 0;
+}
+
+.arrowIcon {
+  font-size: 40rpx;
+  color: $color-text-tertiary;
+  line-height: 1;
+}

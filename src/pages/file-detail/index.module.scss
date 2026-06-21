@@ -1,0 +1,252 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: 140rpx;
+}
+
+.fileHeader {
+  background: linear-gradient(135deg, rgba(39, 194, 139, 0.15) 0%, rgba(51, 112, 255, 0.1) 100%);
+  padding: $spacing-lg $page-padding;
+}
+
+.fileInfo {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: $spacing-lg;
+}
+
+.fileIcon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: $radius-md;
+  background: rgba(51, 112, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fileIconText {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-secondary;
+}
+
+.fileMain {
+  flex: 1;
+  margin-left: $spacing-md;
+  min-width: 0;
+}
+
+.fileName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.fileMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+}
+
+.metaItem {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.statsSection {
+  margin: $spacing-lg 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-sm;
+}
+
+.section {
+  padding: 0 $page-padding;
+  margin-bottom: $spacing-lg;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.sectionTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.memberGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-md;
+}
+
+.memberItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.memberAvatarWrap {
+  position: relative;
+  margin-bottom: $spacing-xs;
+}
+
+.memberAvatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 48rpx;
+  background: $color-bg-hover;
+}
+
+.statusDot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  border: 4rpx solid $color-bg-page;
+
+  &.viewed { background: $color-status-viewed; }
+  &.previewed { background: $color-status-previewed; }
+  &.downloaded { background: $color-status-downloaded; }
+  &.unvisited { background: $color-status-unvisited; }
+}
+
+.memberName {
+  font-size: 24rpx;
+  color: $color-text-secondary;
+  text-align: center;
+  max-width: 100rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logList {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.logItem {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md;
+  border-bottom: 1rpx solid $color-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.logAvatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 36rpx;
+  background: $color-bg-hover;
+  flex-shrink: 0;
+}
+
+.logInfo {
+  flex: 1;
+  margin-left: $spacing-md;
+  min-width: 0;
+}
+
+.logName {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.logAction {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 4rpx;
+}
+
+.logTime {
+  flex-shrink: 0;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-left: $spacing-sm;
+}
+
+.actionTag {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  border-radius: $radius-round;
+  font-size: 22rpx;
+  font-weight: $font-weight-medium;
+  margin-right: $spacing-xs;
+
+  &.view {
+    background: rgba(0, 180, 42, 0.1);
+    color: $color-status-viewed;
+  }
+
+  &.preview {
+    background: rgba(255, 125, 0, 0.1);
+    color: $color-status-previewed;
+  }
+
+  &.download {
+    background: rgba(51, 112, 255, 0.1);
+    color: $color-status-downloaded;
+  }
+}
+
+.bottomBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: $color-bg-card;
+  padding: $spacing-md $page-padding;
+  padding-bottom: calc($spacing-md + env(safe-area-inset-bottom));
+  box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: $spacing-md;
+}
+
+.btn {
+  flex: 1;
+  height: $button-height-lg;
+  border-radius: $radius-button;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+
+  &.primary {
+    background: $color-primary;
+    color: $color-text-white;
+  }
+
+  &.secondary {
+    background: rgba(39, 194, 139, 0.1);
+    color: $color-primary;
+  }
+}

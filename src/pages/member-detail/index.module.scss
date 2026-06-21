@@ -1,0 +1,222 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: $color-bg-page;
+}
+
+.memberHeader {
+  background: linear-gradient(135deg, rgba(39, 194, 139, 0.15) 0%, rgba(51, 112, 255, 0.1) 100%);
+  padding: $spacing-xl $page-padding;
+  text-align: center;
+}
+
+.avatar {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 80rpx;
+  margin: 0 auto;
+  margin-bottom: $spacing-md;
+  background: $color-bg-hover;
+  box-shadow: $shadow-card;
+}
+
+.name {
+  font-size: $font-size-xxl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-xs;
+}
+
+.role {
+  display: inline-block;
+  padding: 6rpx 20rpx;
+  background: rgba(39, 194, 139, 0.15);
+  color: $color-primary;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-round;
+}
+
+.statusSection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: $spacing-md;
+  gap: $spacing-sm;
+}
+
+.statusBadge {
+  padding: 8rpx 24rpx;
+  border-radius: $radius-round;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+}
+
+.statsSection {
+  margin: -30rpx $page-padding $spacing-lg;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  position: relative;
+  z-index: 1;
+  box-shadow: $shadow-card;
+}
+
+.statsTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $spacing-md;
+}
+
+.statItem {
+  text-align: center;
+  padding: $spacing-md 0;
+  background: $color-bg-page;
+  border-radius: $radius-md;
+}
+
+.statNumber {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  line-height: 1.2;
+  margin-bottom: 4rpx;
+
+  &.view { color: $color-status-viewed; }
+  &.preview { color: $color-status-previewed; }
+  &.download { color: $color-status-downloaded; }
+}
+
+.statLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.section {
+  padding: 0 $page-padding;
+  margin-bottom: $spacing-lg;
+}
+
+.sectionTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.lastVisit {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-md;
+  box-shadow: $shadow-card;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lastVisitLabel {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.lastVisitTime {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+}
+
+.timeline {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.timelineItem {
+  display: flex;
+  padding: $spacing-md;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 56rpx;
+    top: 0;
+    bottom: 0;
+    width: 2rpx;
+    background: $color-divider;
+  }
+
+  &:first-child::before {
+    top: 50%;
+  }
+
+  &:last-child::before {
+    bottom: 50%;
+  }
+}
+
+.timelineDot {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  margin-right: $spacing-md;
+  margin-top: 8rpx;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+
+  &.view { background: $color-status-viewed; }
+  &.preview { background: $color-status-previewed; }
+  &.download { background: $color-status-downloaded; }
+}
+
+.timelineContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.timelineAction {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+  margin-bottom: 4rpx;
+}
+
+.timelineTime {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.timelineDuration {
+  flex-shrink: 0;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-left: $spacing-sm;
+}
+
+.emptyState {
+  padding: 80rpx 0;
+  text-align: center;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+}
+
+.emptyIcon {
+  font-size: 80rpx;
+  margin-bottom: $spacing-md;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}

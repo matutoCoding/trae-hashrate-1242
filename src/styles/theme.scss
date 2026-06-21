@@ -1,0 +1,47 @@
+// ============================================
+// 主题配色变量
+// ============================================
+
+// 品牌主题色：清新薄荷绿，传达协作与活力
+$color-primary: #27C28B;
+$color-primary-light: #5CD6A8;
+$color-primary-dark: #1FA876;
+
+// 辅助色：明亮蓝，用于强调操作
+$color-secondary: #3370FF;
+$color-secondary-light: #6B9AFF;
+$color-secondary-dark: #2554CC;
+
+// 功能色
+$color-success: #00B42A;
+$color-warning: #FF7D00;
+$color-error: #F53F3F;
+$color-info: #86909C;
+
+// 状态色（访问状态）
+$color-status-viewed: #00B42A;
+$color-status-previewed: #FF7D00;
+$color-status-downloaded: #3370FF;
+$color-status-unvisited: #F53F3F;
+
+// 背景色
+$color-bg-page: #F7F9FC;
+$color-bg-card: #FFFFFF;
+$color-bg-hover: #F2F3F5;
+$color-bg-tag: #F0F5FF;
+
+// 文本色
+$color-text-primary: #1D2129;
+$color-text-secondary: #4E5969;
+$color-text-tertiary: #86909C;
+$color-text-disabled: #C9CDD4;
+$color-text-white: #FFFFFF;
+
+// 边框色
+$color-border: #E5E6EB;
+$color-divider: #F2F3F5;
+
+// 渐变色
+$gradient-primary: linear-gradient(135deg, #27C28B 0%, #5CD6A8 100%);
+$gradient-secondary: linear-gradient(135deg, #3370FF 0%, #6B9AFF 100%);
+$gradient-bg: linear-gradient(180deg, #F0F7F4 0%, #F7F9FC 100%);

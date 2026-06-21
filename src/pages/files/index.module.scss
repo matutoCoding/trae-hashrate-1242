@@ -1,0 +1,178 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: $gradient-bg;
+}
+
+.header {
+  padding: 0 $page-padding;
+  padding-top: 80rpx;
+  padding-bottom: $spacing-lg;
+  background: linear-gradient(135deg, rgba(39, 194, 139, 0.1) 0%, rgba(51, 112, 255, 0.05) 100%);
+}
+
+.title {
+  font-size: $font-size-xxl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-xs;
+}
+
+.subtitle {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-bottom: $spacing-lg;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  background: $color-bg-card;
+  border-radius: $radius-button;
+  padding: 0 $spacing-md;
+  height: 80rpx;
+  box-shadow: $shadow-card;
+}
+
+.searchIcon {
+  font-size: 32rpx;
+  color: $color-text-tertiary;
+  margin-right: $spacing-sm;
+}
+
+.searchInput {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  background: transparent;
+}
+
+.placeholder {
+  color: $color-text-disabled;
+}
+
+.tabs {
+  display: flex;
+  gap: $spacing-md;
+  padding: 0 $page-padding;
+  margin-bottom: $spacing-md;
+}
+
+.tabItem {
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  border-radius: $radius-button;
+  background: $color-bg-card;
+  font-weight: $font-weight-medium;
+
+  &.active {
+    background: $color-primary;
+    color: $color-text-white;
+  }
+}
+
+.section {
+  padding: 0 $page-padding;
+}
+
+.sectionTitle {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.folderList {
+  margin-bottom: $spacing-lg;
+}
+
+.folderCard {
+  display: flex;
+  align-items: center;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-md;
+  margin-bottom: $spacing-sm;
+  box-shadow: $shadow-card;
+
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+}
+
+.folderIcon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: $radius-md;
+  background: rgba(39, 194, 139, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.folderIconText {
+  font-size: 40rpx;
+}
+
+.folderInfo {
+  flex: 1;
+  margin-left: $spacing-md;
+  min-width: 0;
+}
+
+.folderName {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+  @include text-ellipsis;
+}
+
+.folderMeta {
+  display: flex;
+  align-items: center;
+  margin-top: $spacing-xs;
+}
+
+.folderCount {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.folderDrive {
+  font-size: $font-size-xs;
+  color: $color-primary;
+  margin-left: $spacing-sm;
+  padding: 2rpx 12rpx;
+  background: rgba(39, 194, 139, 0.1);
+  border-radius: $radius-round;
+}
+
+.folderArrow {
+  font-size: 36rpx;
+  color: $color-text-tertiary;
+  margin-left: $spacing-sm;
+}
+
+.fileList {
+  padding-bottom: 120rpx;
+}
+
+.emptyState {
+  padding: 80rpx 0;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 80rpx;
+  margin-bottom: $spacing-md;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}

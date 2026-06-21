@@ -93,6 +93,51 @@
   font-weight: $font-weight-medium;
 }
 
+.searchBar {
+  margin-top: $spacing-md;
+}
+
+.searchInput {
+  width: 100%;
+  height: 72rpx;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: $radius-md;
+  padding: 0 $spacing-md;
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  margin-bottom: $spacing-sm;
+}
+
+.filterRow {
+  margin-top: $spacing-xs;
+}
+
+.filterScroll {
+  @include scroll-x-container;
+}
+
+.filterChip {
+  @include scroll-x-item(auto);
+  padding: 8rpx 20rpx;
+  margin-right: $spacing-xs;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: $radius-button;
+  font-size: 22rpx;
+  color: $color-text-secondary;
+  white-space: nowrap;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.filterChipActive {
+  background: $color-primary;
+  color: $color-text-white;
+  font-weight: $font-weight-medium;
+}
+
 .statsRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

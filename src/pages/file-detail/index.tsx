@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, Image, ScrollView } from '@tarojs/components';
+import { View, Text, Image, ScrollView, Input } from '@tarojs/components';
 import Taro, { useRouter, useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import classnames from 'classnames';
 import { useAppStore } from '@/store';
-import { getFileTypeText, getFileTypeColor, formatTime, formatRelativeTime, TIME_RANGE_OPTIONS } from '@/utils';
+import { getFileTypeText, getFileTypeColor, formatTime, formatRelativeTime, TIME_RANGE_OPTIONS, getStatusText } from '@/utils';
 import type { FileItem, VisitLog, Member, VisitStatus, TimeRange } from '@/types';
 
 interface MemberWithStatus extends Member {
@@ -30,6 +30,9 @@ const FileDetailPage: React.FC = () => {
   const [members, setMembers] = useState<MemberWithStatus[]>([]);
   const [visitLogs, setVisitLogs] = useState<VisitLog[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  const [searchText, setSearchText] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'leader' | 'member'>('all');
+  const [groupFilter, setGroupFilter] = useState<string>('all');
 
   const loadData = () => {
     const fileData = getFileById(fileId);
@@ -40,15 +43,7 @@ const FileDetailPage: React.FC = () => {
       setMembers(memberData);
       const logs = getVisitLogsByFileIdAndTimeRange(fileId, timeRange);
       setVisitLogs(logs);
-      console.log('[FileDetail] 加载数据:', { fileId, timeRange, file: fileData.name, memberCount: memberData.length, logCount: logs.length });
-    } else {
-      console.error('[FileDetail] 文件不存在:', fileId);
     }
-  };
-
-  const handleTimeRangeChange = (range: TimeRange) => {
-    setTimeRange(range);
-    console.log('[FileDetail] 切换时间范围:', range);
   };
 
   useEffect(() => {
@@ -59,18 +54,41 @@ const FileDetailPage: React.FC = () => {
     loadData();
   });
 
-  // 根据筛选后的成员动态计算统计数据
+  const allGroups = useMemo(() => {
+    const groups = new Set(members.map(m => m.group).filter(Boolean));
+    return ['all', ...Array.from(groups).sort()];
+  }, [members]);
+
+  const filteredMembers = useMemo(() => {
+    let result = members;
+    if (searchText.trim()) {
+      const keyword = searchText.trim().toLowerCase();
+      result = result.filter(m => m.name.toLowerCase().includes(keyword));
+    }
+    if (roleFilter !== 'all') {
+      result = result.filter(m => m.role === roleFilter);
+    }
+    if (groupFilter !== 'all') {
+      result = result.filter(m => m.group === groupFilter);
+    }
+    return result;
+  }, [members, searchText, roleFilter, groupFilter]);
+
   const statsInRange = useMemo(() => ({
-    viewed: members.filter(m => m.visitStatus === 'viewed').length,
-    previewed: members.filter(m => m.visitStatus === 'previewed').length,
-    downloaded: members.filter(m => m.visitStatus === 'downloaded').length,
-    unvisited: members.filter(m => m.visitStatus === 'unvisited').length
-  }), [members]);
+    viewed: filteredMembers.filter(m => m.visitStatus === 'viewed').length,
+    previewed: filteredMembers.filter(m => m.visitStatus === 'previewed').length,
+    downloaded: filteredMembers.filter(m => m.visitStatus === 'downloaded').length,
+    unvisited: filteredMembers.filter(m => m.visitStatus === 'unvisited').length
+  }), [filteredMembers]);
 
   const handleRemind = () => {
     if (statsInRange.unvisited > 0) {
+      const params = [`fileId=${fileId}`, `timeRange=${timeRange}`];
+      if (roleFilter !== 'all') params.push(`roleFilter=${roleFilter}`);
+      if (groupFilter !== 'all') params.push(`groupFilter=${encodeURIComponent(groupFilter)}`);
+      if (searchText.trim()) params.push(`searchText=${encodeURIComponent(searchText.trim())}`);
       Taro.navigateTo({
-        url: `/pages/remind-create/index?fileId=${fileId}&timeRange=${timeRange}`
+        url: `/pages/remind-create/index?${params.join('&')}`
       });
     } else {
       Taro.showToast({ title: '全员已查看，无需提醒', icon: 'none' });
@@ -83,16 +101,39 @@ const FileDetailPage: React.FC = () => {
     });
   };
 
+  const handleExport = () => {
+    const actionMap: Record<string, string> = { view: '查看', preview: '预览', download: '下载' };
+    const statusMap: Record<string, string> = { viewed: '已查看', previewed: '仅预览', downloaded: '已下载', unvisited: '未访问' };
+    const timeLabel = TIME_RANGE_OPTIONS.find(o => o.key === timeRange)?.label || '全部记录';
+
+    let text = `📋 访问名单 - ${file?.name}\n`;
+    text += `筛选口径：${timeLabel}`;
+    if (roleFilter !== 'all') text += ` | 角色：${roleFilter === 'leader' ? '组长' : '组员'}`;
+    if (groupFilter !== 'all') text += ` | 小组：${groupFilter}`;
+    text += `\n━━━━━━━━━━━━━━\n`;
+    text += `📊 统计：已查看${statsInRange.viewed} | 仅预览${statsInRange.previewed} | 已下载${statsInRange.downloaded} | 未访问${statsInRange.unvisited}\n`;
+    text += `━━━━━━━━━━━━━━\n`;
+
+    filteredMembers.forEach((m, i) => {
+      const displayTime = timeRange !== 'all'
+        ? (m.lastVisitTimeInRange || '—')
+        : (m.lastVisitTime || '—');
+      text += `${i + 1}. ${m.name}（${m.group}）| ${statusMap[m.visitStatus]} | 最近：${displayTime}\n`;
+    });
+
+    Taro.setClipboardData({
+      data: text,
+      success: () => {
+        Taro.showToast({ title: '已复制到剪贴板', icon: 'success' });
+      }
+    });
+  };
+
   const getActionText = (action: string) => {
-    const map: Record<string, string> = {
-      view: '查看',
-      preview: '预览',
-      download: '下载'
-    };
+    const map: Record<string, string> = { view: '查看', preview: '预览', download: '下载' };
     return map[action] || action;
   };
 
-  // 按状态分组
   const groupedMembers = useMemo(() => {
     const groups: Record<VisitStatus, MemberWithStatus[]> = {
       viewed: [],
@@ -100,11 +141,11 @@ const FileDetailPage: React.FC = () => {
       downloaded: [],
       unvisited: []
     };
-    members.forEach(m => {
+    filteredMembers.forEach(m => {
       groups[m.visitStatus].push(m);
     });
     return groups;
-  }, [members]);
+  }, [filteredMembers]);
 
   if (!file) {
     return (
@@ -135,19 +176,59 @@ const FileDetailPage: React.FC = () => {
             </View>
           </View>
 
-          {/* 时间范围筛选器 */}
           <View className={styles.timeFilter}>
             <ScrollView scrollX className={styles.timeFilterScroll}>
               {TIME_RANGE_OPTIONS.map(option => (
                 <View
                   key={option.key}
                   className={classnames(styles.timeFilterItem, timeRange === option.key && styles.timeFilterActive)}
-                  onClick={() => handleTimeRangeChange(option.key)}
+                  onClick={() => setTimeRange(option.key)}
                 >
                   {option.label}
                 </View>
               ))}
             </ScrollView>
+          </View>
+
+          <View className={styles.searchBar}>
+            <Input
+              className={styles.searchInput}
+              placeholder="搜索成员姓名"
+              value={searchText}
+              onInput={e => setSearchText(e.detail.value)}
+            />
+            <View className={styles.filterRow}>
+              <ScrollView scrollX className={styles.filterScroll}>
+                <View
+                  className={classnames(styles.filterChip, roleFilter === 'all' && styles.filterChipActive)}
+                  onClick={() => setRoleFilter('all')}
+                >
+                  全部角色
+                </View>
+                <View
+                  className={classnames(styles.filterChip, roleFilter === 'leader' && styles.filterChipActive)}
+                  onClick={() => setRoleFilter('leader')}
+                >
+                  组长
+                </View>
+                <View
+                  className={classnames(styles.filterChip, roleFilter === 'member' && styles.filterChipActive)}
+                  onClick={() => setRoleFilter('member')}
+                >
+                  组员
+                </View>
+                <View style={{ width: '16rpx', flexShrink: 0 }} />
+                {allGroups.map(g => (
+                  <View
+                    key={g}
+                    className={classnames(styles.filterChip, groupFilter === g && styles.filterChipActive)}
+                    onClick={() => setGroupFilter(g)}
+                  >
+                    {g === 'all' ? '全部小组' : g}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
           </View>
 
           <View className={styles.statsSection}>
@@ -175,10 +256,9 @@ const FileDetailPage: React.FC = () => {
         <View className={styles.section}>
           <View className={styles.sectionHeader}>
             <Text className={styles.sectionTitle}>成员状态</Text>
-            <Text style={{ fontSize: '26rpx', color: '#86909C' }}>共 {members.length} 人{timeRange !== 'all' && ` · ${TIME_RANGE_OPTIONS.find(o => o.key === timeRange)?.label}`}</Text>
+            <Text style={{ fontSize: '26rpx', color: '#86909C' }}>共 {filteredMembers.length} 人{timeRange !== 'all' && ` · ${TIME_RANGE_OPTIONS.find(o => o.key === timeRange)?.label}`}</Text>
           </View>
 
-          {/* 已查看 */}
           {groupedMembers.viewed.length > 0 && (
             <View style={{ marginBottom: '24rpx' }}>
               <Text style={{ fontSize: '26rpx', color: '#00B42A', fontWeight: '500', marginBottom: '12rpx' }}>
@@ -186,17 +266,9 @@ const FileDetailPage: React.FC = () => {
               </Text>
               <View className={styles.memberGrid}>
                 {groupedMembers.viewed.map(member => (
-                  <View
-                    key={member.id}
-                    className={styles.memberItem}
-                    onClick={() => handleMemberClick(member.id)}
-                  >
+                  <View key={member.id} className={styles.memberItem} onClick={() => handleMemberClick(member.id)}>
                     <View className={styles.memberAvatarWrap}>
-                      <Image
-                        className={styles.memberAvatar}
-                        src={member.avatar}
-                        mode="aspectFill"
-                      />
+                      <Image className={styles.memberAvatar} src={member.avatar} mode="aspectFill" />
                       <View className={classnames(styles.statusDot, styles[member.visitStatus])} />
                     </View>
                     <Text className={styles.memberName}>{member.name}</Text>
@@ -206,7 +278,6 @@ const FileDetailPage: React.FC = () => {
             </View>
           )}
 
-          {/* 仅预览 */}
           {groupedMembers.previewed.length > 0 && (
             <View style={{ marginBottom: '24rpx' }}>
               <Text style={{ fontSize: '26rpx', color: '#FF7D00', fontWeight: '500', marginBottom: '12rpx' }}>
@@ -214,17 +285,9 @@ const FileDetailPage: React.FC = () => {
               </Text>
               <View className={styles.memberGrid}>
                 {groupedMembers.previewed.map(member => (
-                  <View
-                    key={member.id}
-                    className={styles.memberItem}
-                    onClick={() => handleMemberClick(member.id)}
-                  >
+                  <View key={member.id} className={styles.memberItem} onClick={() => handleMemberClick(member.id)}>
                     <View className={styles.memberAvatarWrap}>
-                      <Image
-                        className={styles.memberAvatar}
-                        src={member.avatar}
-                        mode="aspectFill"
-                      />
+                      <Image className={styles.memberAvatar} src={member.avatar} mode="aspectFill" />
                       <View className={classnames(styles.statusDot, styles[member.visitStatus])} />
                     </View>
                     <Text className={styles.memberName}>{member.name}</Text>
@@ -234,7 +297,6 @@ const FileDetailPage: React.FC = () => {
             </View>
           )}
 
-          {/* 已下载 */}
           {groupedMembers.downloaded.length > 0 && (
             <View style={{ marginBottom: '24rpx' }}>
               <Text style={{ fontSize: '26rpx', color: '#3370FF', fontWeight: '500', marginBottom: '12rpx' }}>
@@ -242,17 +304,9 @@ const FileDetailPage: React.FC = () => {
               </Text>
               <View className={styles.memberGrid}>
                 {groupedMembers.downloaded.map(member => (
-                  <View
-                    key={member.id}
-                    className={styles.memberItem}
-                    onClick={() => handleMemberClick(member.id)}
-                  >
+                  <View key={member.id} className={styles.memberItem} onClick={() => handleMemberClick(member.id)}>
                     <View className={styles.memberAvatarWrap}>
-                      <Image
-                        className={styles.memberAvatar}
-                        src={member.avatar}
-                        mode="aspectFill"
-                      />
+                      <Image className={styles.memberAvatar} src={member.avatar} mode="aspectFill" />
                       <View className={classnames(styles.statusDot, styles[member.visitStatus])} />
                     </View>
                     <Text className={styles.memberName}>{member.name}</Text>
@@ -262,7 +316,6 @@ const FileDetailPage: React.FC = () => {
             </View>
           )}
 
-          {/* 未访问 */}
           {groupedMembers.unvisited.length > 0 && (
             <View>
               <Text style={{ fontSize: '26rpx', color: '#F53F3F', fontWeight: '500', marginBottom: '12rpx' }}>
@@ -270,17 +323,9 @@ const FileDetailPage: React.FC = () => {
               </Text>
               <View className={styles.memberGrid}>
                 {groupedMembers.unvisited.map(member => (
-                  <View
-                    key={member.id}
-                    className={styles.memberItem}
-                    onClick={() => handleMemberClick(member.id)}
-                  >
+                  <View key={member.id} className={styles.memberItem} onClick={() => handleMemberClick(member.id)}>
                     <View className={styles.memberAvatarWrap}>
-                      <Image
-                        className={styles.memberAvatar}
-                        src={member.avatar}
-                        mode="aspectFill"
-                      />
+                      <Image className={styles.memberAvatar} src={member.avatar} mode="aspectFill" />
                       <View className={classnames(styles.statusDot, styles[member.visitStatus])} />
                     </View>
                     <Text className={styles.memberName}>{member.name}</Text>
@@ -332,6 +377,9 @@ const FileDetailPage: React.FC = () => {
       <View className={styles.bottomBar}>
         <View className={classnames(styles.btn, styles.secondary)} onClick={handleRemind}>
           催一下 {statsInRange.unvisited > 0 && `(${statsInRange.unvisited})`}
+        </View>
+        <View className={classnames(styles.btn, styles.exportBtn)} onClick={handleExport}>
+          复制名单
         </View>
         <View className={classnames(styles.btn, styles.primary)} onClick={() => {}}>
           查看文件

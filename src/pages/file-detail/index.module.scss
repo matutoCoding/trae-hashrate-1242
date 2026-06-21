@@ -91,6 +91,51 @@
   font-weight: $font-weight-medium;
 }
 
+.searchBar {
+  margin-bottom: $spacing-md;
+}
+
+.searchInput {
+  width: 100%;
+  height: 72rpx;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: 0 $spacing-md;
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  margin-bottom: $spacing-sm;
+}
+
+.filterRow {
+  margin-top: $spacing-xs;
+}
+
+.filterScroll {
+  @include scroll-x-container;
+}
+
+.filterChip {
+  @include scroll-x-item(auto);
+  padding: 8rpx 20rpx;
+  margin-right: $spacing-xs;
+  background: $color-bg-card;
+  border-radius: $radius-button;
+  font-size: 22rpx;
+  color: $color-text-secondary;
+  white-space: nowrap;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.filterChipActive {
+  background: rgba(39, 194, 139, 0.15);
+  color: $color-primary;
+  font-weight: $font-weight-medium;
+}
+
 .statsSection {
   margin: $spacing-lg 0;
 }
@@ -278,5 +323,10 @@
   &.secondary {
     background: rgba(39, 194, 139, 0.1);
     color: $color-primary;
+  }
+
+  &.exportBtn {
+    background: rgba(51, 112, 255, 0.1);
+    color: $color-secondary;
   }
 }

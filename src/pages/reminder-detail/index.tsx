@@ -16,6 +16,8 @@ interface TargetMemberWithVisit {
   followUpStatus: FollowUpStatus;
   firstVisitAfter?: VisitLog;
   allVisitsAfter: VisitLog[];
+  savedVisitTime?: string;
+  savedVisitAction?: string;
 }
 
 const ReminderDetailPage: React.FC = () => {
@@ -24,10 +26,9 @@ const ReminderDetailPage: React.FC = () => {
 
   const getReminderById = useAppStore(state => state.getReminderById);
   const getVisitLogsByFileId = useAppStore(state => state.getVisitLogsByFileId);
-  const getFileById = useAppStore(state => state.getFileById);
 
   const [reminder, setReminder] = useState<ReminderRecord | null>(null);
-  const [filter, setFilter] = useState<'all' | 'followed' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'followed' | 'previewed' | 'pending'>('all');
 
   const loadData = () => {
     const reminderData = getReminderById(reminderId);
@@ -70,47 +71,58 @@ const ReminderDetailPage: React.FC = () => {
         followUpStatus = 'previewed';
       }
 
+      let savedVisitTime: string | undefined;
+      let savedVisitAction: string | undefined;
+      if (member.hasVisitedAfter && member.visitTime) {
+        savedVisitTime = member.visitTime;
+        if (visitsAfter.length === 0) {
+          const beforeLogs = fileLogs.filter(
+            log => log.memberId === member.id && new Date(log.time).getTime() <= reminderTime
+          );
+          if (beforeLogs.length > 0) {
+            const lastBefore = [...beforeLogs].sort(
+              (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+            )[0];
+            savedVisitAction = lastBefore.action;
+          }
+          if (followUpStatus === 'pending') {
+            followUpStatus = 'followed';
+          }
+        }
+      }
+
       return {
         id: member.id,
         name: member.name,
         avatar: member.avatar,
         followUpStatus,
         firstVisitAfter,
-        allVisitsAfter: sortedVisits
+        allVisitsAfter: sortedVisits,
+        savedVisitTime,
+        savedVisitAction
       };
     });
   }, [reminder]);
 
-  const stats = useMemo(() => {
-    return {
-      total: targetMembersWithVisit.length,
-      followed: targetMembersWithVisit.filter(m => m.followUpStatus === 'followed').length,
-      previewed: targetMembersWithVisit.filter(m => m.followUpStatus === 'previewed').length,
-      pending: targetMembersWithVisit.filter(m => m.followUpStatus === 'pending').length
-    };
-  }, [targetMembersWithVisit]);
+  const stats = useMemo(() => ({
+    total: targetMembersWithVisit.length,
+    followed: targetMembersWithVisit.filter(m => m.followUpStatus === 'followed').length,
+    previewed: targetMembersWithVisit.filter(m => m.followUpStatus === 'previewed').length,
+    pending: targetMembersWithVisit.filter(m => m.followUpStatus === 'pending').length
+  }), [targetMembersWithVisit]);
 
   const filteredMembers = useMemo(() => {
     if (filter === 'all') return targetMembersWithVisit;
-    if (filter === 'followed') return targetMembersWithVisit.filter(m => m.followUpStatus === 'followed' || m.followUpStatus === 'previewed');
-    return targetMembersWithVisit.filter(m => m.followUpStatus === 'pending');
+    return targetMembersWithVisit.filter(m => m.followUpStatus === filter);
   }, [targetMembersWithVisit, filter]);
 
   const getActionText = (action: string) => {
-    const map: Record<string, string> = {
-      view: '查看',
-      preview: '预览',
-      download: '下载'
-    };
+    const map: Record<string, string> = { view: '查看', preview: '预览', download: '下载' };
     return map[action] || action;
   };
 
   const getActionColor = (action: string) => {
-    const map: Record<string, string> = {
-      view: '#00B42A',
-      preview: '#FF7D00',
-      download: '#3370FF'
-    };
+    const map: Record<string, string> = { view: '#00B42A', preview: '#FF7D00', download: '#3370FF' };
     return map[action] || '#86909C';
   };
 
@@ -183,10 +195,16 @@ const ReminderDetailPage: React.FC = () => {
               已跟进 ({stats.followed})
             </View>
             <View
+              className={classnames(styles.filterTab, filter === 'previewed' && styles.active)}
+              onClick={() => setFilter('previewed')}
+            >
+              仅预览 ({stats.previewed})
+            </View>
+            <View
               className={classnames(styles.filterTab, filter === 'pending' && styles.active)}
               onClick={() => setFilter('pending')}
             >
-              待跟进 ({stats.pending + stats.previewed})
+              待跟进 ({stats.pending})
             </View>
           </ScrollView>
 
@@ -195,6 +213,7 @@ const ReminderDetailPage: React.FC = () => {
               filteredMembers.map(member => {
                 const badgeInfo = getFollowUpBadgeInfo(member.followUpStatus);
                 const firstAction = member.firstVisitAfter;
+                const hasSavedVisit = !!member.savedVisitTime;
 
                 return (
                   <View
@@ -225,6 +244,18 @@ const ReminderDetailPage: React.FC = () => {
                           </Text>
                         </View>
                       )}
+                      {!firstAction && hasSavedVisit && (
+                        <View className={styles.visitInfo}>
+                          <Text>
+                            跟进记录：
+                            <Text style={{ color: getActionColor(member.savedVisitAction || ''), fontWeight: 500 }}>
+                              {getActionText(member.savedVisitAction || '查看')}
+                            </Text>
+                            {' · '}
+                            {formatTime(member.savedVisitTime!)}
+                          </Text>
+                        </View>
+                      )}
                       {member.allVisitsAfter.length > 1 && (
                         <View className={styles.visitInfo}>
                           <Text style={{ color: '#86909C' }}>
@@ -242,7 +273,9 @@ const ReminderDetailPage: React.FC = () => {
                     <Text className={styles.visitTime}>
                       {firstAction
                         ? formatRelativeTime(firstAction.time)
-                        : '—'}
+                        : hasSavedVisit
+                          ? formatRelativeTime(member.savedVisitTime!)
+                          : '—'}
                     </Text>
                   </View>
                 );

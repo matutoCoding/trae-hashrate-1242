@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, Image, ScrollView, Button } from '@tarojs/components';
+import { View, Text, Image, ScrollView, Input } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import classnames from 'classnames';
@@ -28,8 +28,10 @@ const StatusPage: React.FC = () => {
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
   const [members, setMembers] = useState<MemberWithStatus[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'leader' | 'member'>('all');
+  const [groupFilter, setGroupFilter] = useState<string>('all');
 
-  // 当前选中的文件
   const currentFile = useMemo(() => {
     if (currentFileId) {
       return getFileById(currentFileId) || files[0];
@@ -37,51 +39,65 @@ const StatusPage: React.FC = () => {
     return files[0];
   }, [currentFileId, files]);
 
-  // 加载数据
   const loadData = () => {
     if (!currentFile) return;
     const memberData = getMembersByFileIdAndTimeRange(currentFile.id, timeRange) as MemberWithStatus[];
     setMembers(memberData);
-    console.log('[StatusPage] 加载数据:', { fileId: currentFile.id, timeRange, memberCount: memberData.length });
   };
 
-  // 切换文件或时间范围时重新加载
   useEffect(() => {
     loadData();
   }, [currentFile, timeRange]);
 
-  // 每次页面显示时刷新数据
   useDidShow(() => {
     loadData();
-    console.log('[StatusPage] 页面显示，当前文件:', currentFile?.name);
   });
 
-  const handleTimeRangeChange = (range: TimeRange) => {
-    setTimeRange(range);
-    console.log('[StatusPage] 切换时间范围:', range);
-  };
-
-  // 统计数据 - 根据当前文件的成员状态计算
-  const statusStats = useMemo(() => ({
-    total: members.length,
-    viewed: members.filter(m => m.visitStatus === 'viewed').length,
-    previewed: members.filter(m => m.visitStatus === 'previewed').length,
-    downloaded: members.filter(m => m.visitStatus === 'downloaded').length,
-    unvisited: members.filter(m => m.visitStatus === 'unvisited').length
-  }), [members]);
-
-  // 过滤成员
-  const filteredMembers = useMemo(() => {
-    if (filterStatus === 'all') {
-      return members;
-    }
-    return members.filter(m => m.visitStatus === filterStatus);
-  }, [members, filterStatus]);
-
-  // 未访问成员
-  const unvisitedMembers = useMemo(() => {
-    return members.filter(m => m.visitStatus === 'unvisited');
+  const allGroups = useMemo(() => {
+    const groups = new Set(members.map(m => m.group).filter(Boolean));
+    return ['all', ...Array.from(groups).sort()];
   }, [members]);
+
+  const filteredMembers = useMemo(() => {
+    let result = members;
+    if (searchText.trim()) {
+      const keyword = searchText.trim().toLowerCase();
+      result = result.filter(m => m.name.toLowerCase().includes(keyword));
+    }
+    if (roleFilter !== 'all') {
+      result = result.filter(m => m.role === roleFilter);
+    }
+    if (groupFilter !== 'all') {
+      result = result.filter(m => m.group === groupFilter);
+    }
+    if (filterStatus !== 'all') {
+      result = result.filter(m => m.visitStatus === filterStatus);
+    }
+    return result;
+  }, [members, searchText, roleFilter, groupFilter, filterStatus]);
+
+  const statusStats = useMemo(() => {
+    const baseMembers = members.filter(m => {
+      if (searchText.trim()) {
+        const keyword = searchText.trim().toLowerCase();
+        if (!m.name.toLowerCase().includes(keyword)) return false;
+      }
+      if (roleFilter !== 'all' && m.role !== roleFilter) return false;
+      if (groupFilter !== 'all' && m.group !== groupFilter) return false;
+      return true;
+    });
+    return {
+      total: baseMembers.length,
+      viewed: baseMembers.filter(m => m.visitStatus === 'viewed').length,
+      previewed: baseMembers.filter(m => m.visitStatus === 'previewed').length,
+      downloaded: baseMembers.filter(m => m.visitStatus === 'downloaded').length,
+      unvisited: baseMembers.filter(m => m.visitStatus === 'unvisited').length
+    };
+  }, [members, searchText, roleFilter, groupFilter]);
+
+  const unvisitedMembers = useMemo(() => {
+    return filteredMembers.filter(m => m.visitStatus === 'unvisited');
+  }, [filteredMembers]);
 
   const handleMemberClick = (memberId: string) => {
     if (!currentFile) return;
@@ -94,14 +110,20 @@ const StatusPage: React.FC = () => {
     setCurrentFile(file.id);
     setShowFilePicker(false);
     setFilterStatus('all');
-    console.log('[StatusPage] 切换文件:', file.name);
+    setSearchText('');
+    setRoleFilter('all');
+    setGroupFilter('all');
   };
 
   const handleRemind = () => {
     if (!currentFile) return;
     if (unvisitedMembers.length > 0) {
+      const params = [`fileId=${currentFile.id}`, `timeRange=${timeRange}`];
+      if (roleFilter !== 'all') params.push(`roleFilter=${roleFilter}`);
+      if (groupFilter !== 'all') params.push(`groupFilter=${encodeURIComponent(groupFilter)}`);
+      if (searchText.trim()) params.push(`searchText=${encodeURIComponent(searchText.trim())}`);
       Taro.navigateTo({
-        url: `/pages/remind-create/index?fileId=${currentFile.id}&timeRange=${timeRange}`
+        url: `/pages/remind-create/index?${params.join('&')}`
       });
     } else {
       Taro.showToast({ title: '全员已查看，无需提醒', icon: 'none' });
@@ -167,19 +189,59 @@ const StatusPage: React.FC = () => {
           </View>
         </View>
 
-        {/* 时间范围筛选器 */}
         <View className={styles.timeFilter}>
           <ScrollView scrollX className={styles.timeFilterScroll}>
             {TIME_RANGE_OPTIONS.map(option => (
               <View
                 key={option.key}
                 className={classnames(styles.timeFilterItem, timeRange === option.key && styles.timeFilterActive)}
-                onClick={() => handleTimeRangeChange(option.key)}
+                onClick={() => setTimeRange(option.key)}
               >
                 {option.label}
               </View>
             ))}
           </ScrollView>
+        </View>
+
+        <View className={styles.searchBar}>
+          <Input
+            className={styles.searchInput}
+            placeholder="搜索成员姓名"
+            value={searchText}
+            onInput={e => setSearchText(e.detail.value)}
+          />
+          <View className={styles.filterRow}>
+            <ScrollView scrollX className={styles.filterScroll}>
+              <View
+                className={classnames(styles.filterChip, roleFilter === 'all' && styles.filterChipActive)}
+                onClick={() => setRoleFilter('all')}
+              >
+                全部角色
+              </View>
+              <View
+                className={classnames(styles.filterChip, roleFilter === 'leader' && styles.filterChipActive)}
+                onClick={() => setRoleFilter('leader')}
+              >
+                组长
+              </View>
+              <View
+                className={classnames(styles.filterChip, roleFilter === 'member' && styles.filterChipActive)}
+                onClick={() => setRoleFilter('member')}
+              >
+                组员
+              </View>
+              <View style={{ width: '16rpx', flexShrink: 0 }} />
+              {allGroups.map(g => (
+                <View
+                  key={g}
+                  className={classnames(styles.filterChip, groupFilter === g && styles.filterChipActive)}
+                  onClick={() => setGroupFilter(g)}
+                >
+                  {g === 'all' ? '全部小组' : g}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
         </View>
       </View>
 
@@ -258,7 +320,6 @@ const StatusPage: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* 文件选择弹窗 */}
       {showFilePicker && (
         <View
           style={{

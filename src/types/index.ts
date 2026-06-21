@@ -10,6 +10,7 @@ export interface Member {
   name: string;
   avatar: string;
   role: 'leader' | 'member';
+  group: string;
   visitStatus: VisitStatus;
   lastVisitTime?: string;
   visitCount: number;

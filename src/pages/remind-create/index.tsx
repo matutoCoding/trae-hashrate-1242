@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, Image, ScrollView, Textarea } from '@tarojs/components';
+import { View, Text, Image, ScrollView, Textarea, Switch } from '@tarojs/components';
 import Taro, { useRouter } from '@tarojs/taro';
 import styles from './index.module.scss';
 import classnames from 'classnames';
@@ -13,6 +13,7 @@ interface MemberWithStatus extends Member {
   visitCount: number;
   previewCount: number;
   downloadCount: number;
+  daysSinceLastVisit: number;
 }
 
 const RemindCreatePage: React.FC = () => {
@@ -20,22 +21,45 @@ const RemindCreatePage: React.FC = () => {
   const fileId = router.params.fileId || 'file1';
 
   const getFileById = useAppStore(state => state.getFileById);
+  const getMembersForReminder = useAppStore(state => state.getMembersForReminder);
   const getMembersByFileId = useAppStore(state => state.getMembersByFileId);
   const addReminder = useAppStore(state => state.addReminder);
 
   const [file, setFile] = useState<FileItem | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [customMessage, setCustomMessage] = useState('');
+  const [includeNotVisitedForDays, setIncludeNotVisitedForDays] = useState<number | null>(null);
 
-  // 只获取当前文件的未访问成员
+  // 未访问成员
   const unvisitedMembers = useMemo(() => {
-    const allMembers = getMembersByFileId(fileId) as MemberWithStatus[];
-    return allMembers.filter(m => m.visitStatus === 'unvisited');
+    return getMembersForReminder(fileId, { includeUnvisited: true }) as MemberWithStatus[];
   }, [fileId]);
+
+  // 超过指定天数未访问的成员（已访问但很久没看）
+  const longNotVisitedMembers = useMemo(() => {
+    if (includeNotVisitedForDays === null) return [];
+    return getMembersForReminder(fileId, {
+      includeUnvisited: false,
+      includeNotVisitedForDays
+    }) as MemberWithStatus[];
+  }, [fileId, includeNotVisitedForDays]);
+
+  // 所有可选成员（未访问 + 超过N天未访问）
+  const selectableMembers = useMemo(() => {
+    return [...unvisitedMembers, ...longNotVisitedMembers];
+  }, [unvisitedMembers, longNotVisitedMembers]);
 
   // 所有成员（用于显示已查看的信息）
   const allMembersForFile = useMemo(() => {
     return getMembersByFileId(fileId) as MemberWithStatus[];
+  }, [fileId]);
+
+  // 成员最后一次访问超过3天的可选项
+  const longNotVisitedOptionMembers = useMemo(() => {
+    return getMembersForReminder(fileId, {
+      includeUnvisited: false,
+      includeNotVisitedForDays: 3
+    }) as MemberWithStatus[];
   }, [fileId]);
 
   useEffect(() => {
@@ -43,13 +67,14 @@ const RemindCreatePage: React.FC = () => {
     if (fileData) {
       setFile(fileData);
 
-      // 默认选中所有未访问成员
+      // 默认只选中未访问成员
       const defaultSelected = unvisitedMembers.map(m => m.id);
       setSelectedMemberIds(defaultSelected);
 
       // 生成默认文案
-      if (unvisitedMembers.length > 0) {
-        const memberNames = unvisitedMembers.map(m => m.name);
+      if (defaultSelected.length > 0) {
+        const selectedMembers = unvisitedMembers.filter(m => defaultSelected.includes(m.id));
+        const memberNames = selectedMembers.map(m => m.name);
         setCustomMessage(generateReminderText(fileData.name, memberNames));
       }
 
@@ -57,14 +82,36 @@ const RemindCreatePage: React.FC = () => {
         fileId,
         fileName: fileData.name,
         unvisitedCount: unvisitedMembers.length,
+        longNotVisitedCount: longNotVisitedOptionMembers.length,
         allMembersCount: allMembersForFile.length
       });
     }
   }, [fileId]);
 
+  // 当筛选条件变化时，保持未访问成员始终选中
+  useEffect(() => {
+    const unvisitedIds = unvisitedMembers.map(m => m.id);
+    const longNotVisitedIds = longNotVisitedMembers.map(m => m.id);
+    const allSelectableIds = [...unvisitedIds, ...longNotVisitedIds];
+
+    setSelectedMemberIds(prev => {
+      // 保留原来已选中且仍在可选列表中的成员
+      const stillSelectable = prev.filter(id => allSelectableIds.includes(id));
+      // 确保所有未访问成员都被选中（默认行为）
+      const withUnvisited = [...new Set([...stillSelectable, ...unvisitedIds])];
+      return withUnvisited;
+    });
+  }, [includeNotVisitedForDays]);
+
   const handleSelectMember = (memberId: string) => {
     setSelectedMemberIds(prev => {
       if (prev.includes(memberId)) {
+        // 未访问成员不允许取消选中（保持默认行为）
+        const isUnvisited = unvisitedMembers.some(m => m.id === memberId);
+        if (isUnvisited) {
+          Taro.showToast({ title: '未访问成员默认选中', icon: 'none' });
+          return prev;
+        }
         return prev.filter(id => id !== memberId);
       }
       return [...prev, memberId];
@@ -72,18 +119,24 @@ const RemindCreatePage: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    // 全选/取消全选只针对当前文件的未访问成员
-    if (selectedMemberIds.length === unvisitedMembers.length && unvisitedMembers.length > 0) {
-      setSelectedMemberIds([]);
-    } else {
+    // 全选/取消全选针对所有可选成员
+    if (selectedMemberIds.length === selectableMembers.length && selectableMembers.length > 0) {
+      // 取消全选，但保留未访问成员
       setSelectedMemberIds(unvisitedMembers.map(m => m.id));
+    } else {
+      setSelectedMemberIds(selectableMembers.map(m => m.id));
     }
+  };
+
+  const handleToggleLongNotVisited = (checked: boolean) => {
+    setIncludeNotVisitedForDays(checked ? 3 : null);
+    console.log('[RemindCreate] 切换超过3天未访问筛选:', checked);
   };
 
   const handleRefreshTemplate = () => {
     if (!file) return;
-    // 只对当前选中的成员生成文案
-    const selectedMembers = unvisitedMembers.filter(m => selectedMemberIds.includes(m.id));
+    // 对当前选中的成员生成文案
+    const selectedMembers = selectableMembers.filter(m => selectedMemberIds.includes(m.id));
     const memberNames = selectedMembers.map(m => m.name);
     if (memberNames.length > 0) {
       setCustomMessage(generateReminderText(file.name, memberNames));
@@ -103,7 +156,7 @@ const RemindCreatePage: React.FC = () => {
       return;
     }
 
-    const targetMembers = unvisitedMembers
+    const targetMembers = selectableMembers
       .filter(m => selectedMemberIds.includes(m.id))
       .map(m => ({
         id: m.id,
@@ -143,10 +196,10 @@ const RemindCreatePage: React.FC = () => {
     });
   };
 
-  const selectedMembers = unvisitedMembers.filter(m => selectedMemberIds.includes(m.id));
+  const selectedMembers = selectableMembers.filter(m => selectedMemberIds.includes(m.id));
 
-  // 如果全员已查看，显示友好提示
-  if (file && unvisitedMembers.length === 0) {
+  // 如果全员已查看且没有超过3天未访问的成员，显示友好提示
+  if (file && unvisitedMembers.length === 0 && longNotVisitedOptionMembers.length === 0) {
     return (
       <View className={styles.page}>
         <View style={{
@@ -187,6 +240,9 @@ const RemindCreatePage: React.FC = () => {
     );
   }
 
+  // 如果只有未访问成员为0但有超过3天未访问的，显示另一种提示
+  const showLongNotVisitedOption = unvisitedMembers.length === 0 && longNotVisitedOptionMembers.length > 0;
+
   return (
     <View className={styles.page}>
       <ScrollView scrollY>
@@ -195,21 +251,55 @@ const RemindCreatePage: React.FC = () => {
           <Text className={styles.fileName}>{file?.name || '加载中...'}</Text>
         </View>
 
+        {showLongNotVisitedOption && (
+          <View className={styles.allViewedBanner}>
+            <Text style={{ fontSize: '48rpx', marginRight: '16rpx' }}>✨</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: '28rpx', fontWeight: '600', color: '#1D2129' }}>
+                新成员都已查看
+              </Text>
+              <Text style={{ fontSize: '24rpx', color: '#86909C', marginTop: '4rpx' }}>
+                但有 {longNotVisitedOptionMembers.length} 位成员超过3天没看了，需要提醒吗？
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View className={styles.section}>
           <View className={styles.sectionHeader}>
             <Text className={styles.sectionTitle}>
               提醒对象
               <Text style={{ color: '#F53F3F', marginLeft: '8rpx' }}>
-                ({unvisitedMembers.length}人未看)
+                ({selectableMembers.length}人)
               </Text>
             </Text>
             <Text className={styles.selectAll} onClick={handleSelectAll}>
-              {selectedMemberIds.length === unvisitedMembers.length && unvisitedMembers.length > 0
+              {selectedMemberIds.length === selectableMembers.length && selectableMembers.length > 0
                 ? '取消全选'
                 : '全选'
               }
             </Text>
           </View>
+
+          {/* 超过3天未访问筛选开关 */}
+          {longNotVisitedOptionMembers.length > 0 && (
+            <View className={styles.filterSwitch}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: '28rpx', color: '#1D2129', fontWeight: '500' }}>
+                  包含超过3天未访问的成员
+                </Text>
+                <Text style={{ fontSize: '24rpx', color: '#86909C', marginTop: '4rpx' }}>
+                  已查看但超过3天没再打开，可能需要再次提醒
+                </Text>
+              </View>
+              <Switch
+                checked={includeNotVisitedForDays !== null}
+                onChange={e => handleToggleLongNotVisited(e.detail.value)}
+                color="#27C28B"
+              />
+            </View>
+          )}
+
           <View className={styles.memberList}>
             {unvisitedMembers.map(member => (
               <View
@@ -220,8 +310,30 @@ const RemindCreatePage: React.FC = () => {
                 <Image className={styles.avatar} src={member.avatar} mode="aspectFill" />
                 <View className={styles.memberInfo}>
                   <Text className={styles.memberName}>{member.name}</Text>
-                  <Text className={styles.memberStatus}>
+                  <Text className={classnames(styles.memberStatus, styles.unvisited)}>
                     {getStatusText(member.visitStatus)}
+                  </Text>
+                </View>
+                <View className={classnames(styles.checkbox, styles.mandatory, selectedMemberIds.includes(member.id) && styles.checked)}>
+                  {selectedMemberIds.includes(member.id) && (
+                    <Text className={styles.checkIcon}>✓</Text>
+                  )}
+                </View>
+              </View>
+            ))}
+
+            {/* 超过3天未访问的成员 */}
+            {longNotVisitedMembers.map(member => (
+              <View
+                key={member.id}
+                className={classnames(styles.memberItem, styles.longNotVisited)}
+                onClick={() => handleSelectMember(member.id)}
+              >
+                <Image className={styles.avatar} src={member.avatar} mode="aspectFill" />
+                <View className={styles.memberInfo}>
+                  <Text className={styles.memberName}>{member.name}</Text>
+                  <Text className={classnames(styles.memberStatus, styles.longNotVisitedText)}>
+                    {member.daysSinceLastVisit}天未访问
                   </Text>
                 </View>
                 <View className={classnames(styles.checkbox, selectedMemberIds.includes(member.id) && styles.checked)}>

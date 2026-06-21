@@ -61,6 +61,36 @@
   color: $color-text-tertiary;
 }
 
+.timeFilter {
+  margin-bottom: $spacing-md;
+}
+
+.timeFilterScroll {
+  @include scroll-x-container;
+}
+
+.timeFilterItem {
+  @include scroll-x-item(auto);
+  padding: 12rpx 28rpx;
+  margin-right: $spacing-sm;
+  background: $color-bg-card;
+  border-radius: $radius-button;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  white-space: nowrap;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.timeFilterActive {
+  background: $color-primary;
+  color: $color-text-white;
+  font-weight: $font-weight-medium;
+}
+
 .statsSection {
   margin: $spacing-lg 0;
 }

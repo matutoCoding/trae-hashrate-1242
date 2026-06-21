@@ -5,7 +5,8 @@ export default defineAppConfig({
     'pages/reminders/index',
     'pages/file-detail/index',
     'pages/member-detail/index',
-    'pages/remind-create/index'
+    'pages/remind-create/index',
+    'pages/reminder-detail/index'
   ],
   window: {
     backgroundTextStyle: 'light',

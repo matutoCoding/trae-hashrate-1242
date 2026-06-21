@@ -25,6 +25,62 @@
   line-height: 1.5;
 }
 
+.allViewedBanner {
+  display: flex;
+  align-items: center;
+  margin: 0 $page-padding $spacing-md;
+  padding: $spacing-md;
+  background: linear-gradient(135deg, rgba(39, 194, 139, 0.1) 0%, rgba(51, 112, 255, 0.05) 100%);
+  border-radius: $radius-lg;
+}
+
+.filterSwitch {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md;
+  background: $color-bg-page;
+  border-radius: $radius-md;
+  margin-bottom: $spacing-md;
+}
+
+.memberStatus {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 4rpx;
+
+  &.unvisited {
+    color: $color-error;
+  }
+}
+
+.checkbox {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 3rpx solid $color-border;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.checked {
+    background: $color-primary;
+    border-color: $color-primary;
+  }
+
+  &.mandatory {
+    border-color: $color-primary;
+  }
+}
+
+.longNotVisited {
+  opacity: 0.8;
+}
+
+.longNotVisitedText {
+  color: $color-warning;
+}
+
 .section {
   padding: $spacing-md $page-padding;
   background: $color-bg-card;

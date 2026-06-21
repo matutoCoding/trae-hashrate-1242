@@ -78,7 +78,15 @@ const RemindersPage: React.FC = () => {
         <View className={styles.list}>
           {filteredReminders.length > 0 ? (
             filteredReminders.map(reminder => (
-              <ReminderCard key={reminder.id} reminder={reminder} />
+              <ReminderCard
+                key={reminder.id}
+                reminder={reminder}
+                onClick={() => {
+                  Taro.navigateTo({
+                    url: `/pages/reminder-detail/index?id=${reminder.id}`
+                  });
+                }}
+              />
             ))
           ) : (
             <View className={styles.emptyState}>

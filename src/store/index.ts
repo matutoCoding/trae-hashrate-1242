@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { FileItem, Member, VisitLog, ReminderRecord, VisitStatus } from '@/types';
+import type { FileItem, Member, VisitLog, ReminderRecord, VisitStatus, TimeRange } from '@/types';
 import { mockFiles, mockFolders } from '@/data/files';
 import { mockMembers } from '@/data/members';
 import { mockReminders } from '@/data/reminders';
+import { isTimeInRange, getMemberStatusInRange, getDaysSinceLastVisit } from '@/utils';
 
 // 按文件存储的成员状态
 interface FileMemberStatus {
@@ -51,6 +52,12 @@ interface AppState {
   getVisitLogsByFileAndMember: (fileId: string, memberId: string) => VisitLog[];
   addReminder: (reminder: Omit<ReminderRecord, 'id' | 'createTime'>) => void;
   markMemberVisitedAfterReminder: (reminderId: string, memberId: string, visitTime: string) => void;
+
+  // 按时间范围筛选的方法
+  getVisitLogsByFileIdAndTimeRange: (fileId: string, timeRange: TimeRange) => VisitLog[];
+  getMembersByFileIdAndTimeRange: (fileId: string, timeRange: TimeRange) => (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
+  getMembersForReminder: (fileId: string, options?: { includeUnvisited?: boolean; includeNotVisitedForDays?: number }) => (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
+  getReminderById: (reminderId: string) => ReminderRecord | undefined;
 }
 
 // 初始化每个文件的成员状态
@@ -60,6 +67,8 @@ const initFileMembersStatus = (): FileMembersStatus => {
   mockFiles.forEach(file => {
     // 为每个文件生成独立的成员状态，略有不同
     const seed = file.id.charCodeAt(file.id.length - 1);
+    // 是否全员已查看（不允许有未访问成员）
+    const allMustBeViewed = file.unvisitedCount === 0;
 
     statusMap[file.id] = mockMembers.map((member, index) => {
       // 根据文件和成员生成不同的状态
@@ -71,31 +80,37 @@ const initFileMembersStatus = (): FileMembersStatus => {
       let downloadCount = 0;
       let lastVisitTime: string | undefined;
 
+      // 调整随机值，确保全员已查看的文件没有 unvisited
+      let adjustedRandom = pseudoRandom;
+      if (allMustBeViewed && adjustedRandom >= 80) {
+        adjustedRandom = adjustedRandom % 80;
+      }
+
       // 参考文献数据，但为每个文件生成不同的分布
-      if (pseudoRandom < 40) {
+      if (adjustedRandom < 40) {
         visitStatus = 'viewed';
-        visitCount = Math.floor(pseudoRandom / 10) + 1;
-        previewCount = Math.floor(pseudoRandom / 15);
-        downloadCount = Math.floor(pseudoRandom / 30);
-        const daysAgo = (pseudoRandom % 3) + 1;
-        const hoursAgo = (pseudoRandom * 3) % 24;
-        lastVisitTime = `2026-06-${22 - daysAgo} ${String(hoursAgo).padStart(2, '0')}:${String((pseudoRandom * 5) % 60).padStart(2, '0')}:00`;
-      } else if (pseudoRandom < 65) {
+        visitCount = Math.floor(adjustedRandom / 10) + 1;
+        previewCount = Math.floor(adjustedRandom / 15);
+        downloadCount = Math.floor(adjustedRandom / 30);
+        const daysAgo = (adjustedRandom % 3) + 1;
+        const hoursAgo = (adjustedRandom * 3) % 24;
+        lastVisitTime = `2026-06-${22 - daysAgo} ${String(hoursAgo).padStart(2, '0')}:${String((adjustedRandom * 5) % 60).padStart(2, '0')}:00`;
+      } else if (adjustedRandom < 65) {
         visitStatus = 'previewed';
-        previewCount = Math.floor((pseudoRandom - 40) / 8) + 1;
+        previewCount = Math.floor((adjustedRandom - 40) / 8) + 1;
         visitCount = 0;
         downloadCount = 0;
-        const daysAgo = ((pseudoRandom - 40) % 2) + 1;
-        const hoursAgo = (pseudoRandom * 4) % 24;
-        lastVisitTime = `2026-06-${22 - daysAgo} ${String(hoursAgo).padStart(2, '0')}:${String((pseudoRandom * 7) % 60).padStart(2, '0')}:00`;
-      } else if (pseudoRandom < 80) {
+        const daysAgo = ((adjustedRandom - 40) % 2) + 1;
+        const hoursAgo = (adjustedRandom * 4) % 24;
+        lastVisitTime = `2026-06-${22 - daysAgo} ${String(hoursAgo).padStart(2, '0')}:${String((adjustedRandom * 7) % 60).padStart(2, '0')}:00`;
+      } else if (adjustedRandom < 80) {
         visitStatus = 'downloaded';
         downloadCount = 1;
         visitCount = 0;
         previewCount = 0;
-        const daysAgo = ((pseudoRandom - 65) % 2) + 1;
-        const hoursAgo = (pseudoRandom * 2) % 24;
-        lastVisitTime = `2026-06-${22 - daysAgo} ${String(hoursAgo).padStart(2, '0')}:${String((pseudoRandom * 3) % 60).padStart(2, '0')}:00`;
+        const daysAgo = ((adjustedRandom - 65) % 2) + 1;
+        const hoursAgo = (adjustedRandom * 2) % 24;
+        lastVisitTime = `2026-06-${22 - daysAgo} ${String(hoursAgo).padStart(2, '0')}:${String((adjustedRandom * 3) % 60).padStart(2, '0')}:00`;
       } else {
         visitStatus = 'unvisited';
         lastVisitTime = undefined;
@@ -285,6 +300,91 @@ export const useAppStore = create<AppState>()(
             };
           })
         }));
+      },
+
+      // 按时间范围筛选访问日志
+      getVisitLogsByFileIdAndTimeRange: (fileId, timeRange) => {
+        const logs = get().fileVisitLogs[fileId] || [];
+        if (timeRange === 'all') return logs;
+        return logs.filter(log => isTimeInRange(log.time, timeRange));
+      },
+
+      // 按时间范围获取成员状态（根据范围内的日志重新计算状态）
+      getMembersByFileIdAndTimeRange: (fileId, timeRange) => {
+        const state = get();
+        const allLogs = state.fileVisitLogs[fileId] || [];
+        const memberStatuses = state.fileMembersStatus[fileId] || [];
+
+        return memberStatuses
+          .map(status => {
+            const member = state.allMembers.find(m => m.id === status.memberId);
+            if (!member) return null;
+
+            // 筛选该成员在时间范围内的日志
+            const memberLogsInRange = allLogs.filter(
+              log => log.memberId === status.memberId && isTimeInRange(log.time, timeRange)
+            );
+
+            // 根据范围内的日志重新计算状态
+            const statusInRange = getMemberStatusInRange(status, memberLogsInRange);
+
+            // 计算最后一次访问距离现在的天数
+            const daysSinceLastVisit = getDaysSinceLastVisit(status.lastVisitTime);
+
+            return {
+              ...member,
+              ...status,
+              ...statusInRange,
+              // 保留原始的最后访问时间用于显示
+              lastVisitTime: status.lastVisitTime,
+              daysSinceLastVisit
+            };
+          })
+          .filter(Boolean) as (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
+      },
+
+      // 获取提醒对象（支持未访问和超过N天未访问双维度筛选）
+      getMembersForReminder: (fileId, options = {}) => {
+        const { includeUnvisited = true, includeNotVisitedForDays } = options;
+        const state = get();
+        const memberStatuses = state.fileMembersStatus[fileId] || [];
+
+        return memberStatuses
+          .map(status => {
+            const member = state.allMembers.find(m => m.id === status.memberId);
+            if (!member) return null;
+
+            const daysSinceLastVisit = getDaysSinceLastVisit(status.lastVisitTime);
+
+            // 判断是否符合筛选条件
+            let shouldInclude = false;
+
+            // 未访问的成员
+            if (includeUnvisited && status.visitStatus === 'unvisited') {
+              shouldInclude = true;
+            }
+
+            // 超过指定天数未访问的成员（即使已经访问过）
+            if (includeNotVisitedForDays !== undefined && status.visitStatus !== 'unvisited') {
+              if (daysSinceLastVisit >= includeNotVisitedForDays) {
+                shouldInclude = true;
+              }
+            }
+
+            if (!shouldInclude) return null;
+
+            return {
+              ...member,
+              ...status,
+              daysSinceLastVisit
+            };
+          })
+          .filter(Boolean) as (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
+      },
+
+      // 根据ID获取提醒详情
+      getReminderById: (reminderId) => {
+        return get().reminders.find(r => r.id === reminderId);
       }
     }),
     {

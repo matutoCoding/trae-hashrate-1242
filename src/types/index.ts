@@ -1,3 +1,6 @@
+// 时间范围类型
+export type TimeRange = '24h' | '7d' | 'all';
+
 // 访问状态枚举
 export type VisitStatus = 'viewed' | 'previewed' | 'downloaded' | 'unvisited';
 

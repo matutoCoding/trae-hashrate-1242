@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, Image, ScrollView, Button } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import classnames from 'classnames';
 import { useAppStore } from '@/store';
-import { getStatusText, formatRelativeTime } from '@/utils';
-import type { Member, VisitStatus, FileItem } from '@/types';
+import { getStatusText, formatRelativeTime, TIME_RANGE_OPTIONS } from '@/utils';
+import type { Member, VisitStatus, FileItem, TimeRange } from '@/types';
 
 interface MemberWithStatus extends Member {
   visitStatus: VisitStatus;
@@ -13,6 +13,7 @@ interface MemberWithStatus extends Member {
   visitCount: number;
   previewCount: number;
   downloadCount: number;
+  daysSinceLastVisit: number;
 }
 
 const StatusPage: React.FC = () => {
@@ -20,10 +21,12 @@ const StatusPage: React.FC = () => {
   const currentFileId = useAppStore(state => state.currentFileId);
   const setCurrentFile = useAppStore(state => state.setCurrentFile);
   const getFileById = useAppStore(state => state.getFileById);
-  const getMembersByFileId = useAppStore(state => state.getMembersByFileId);
+  const getMembersByFileIdAndTimeRange = useAppStore(state => state.getMembersByFileIdAndTimeRange);
 
   const [filterStatus, setFilterStatus] = useState<VisitStatus | 'all'>('all');
   const [showFilePicker, setShowFilePicker] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  const [members, setMembers] = useState<MemberWithStatus[]>([]);
 
   // 当前选中的文件
   const currentFile = useMemo(() => {
@@ -33,16 +36,29 @@ const StatusPage: React.FC = () => {
     return files[0];
   }, [currentFileId, files]);
 
-  // 当前文件的成员状态
-  const members = useMemo(() => {
-    if (!currentFile) return [];
-    return getMembersByFileId(currentFile.id) as MemberWithStatus[];
-  }, [currentFile]);
+  // 加载数据
+  const loadData = () => {
+    if (!currentFile) return;
+    const memberData = getMembersByFileIdAndTimeRange(currentFile.id, timeRange) as MemberWithStatus[];
+    setMembers(memberData);
+    console.log('[StatusPage] 加载数据:', { fileId: currentFile.id, timeRange, memberCount: memberData.length });
+  };
+
+  // 切换文件或时间范围时重新加载
+  useEffect(() => {
+    loadData();
+  }, [currentFile, timeRange]);
 
   // 每次页面显示时刷新数据
   useDidShow(() => {
+    loadData();
     console.log('[StatusPage] 页面显示，当前文件:', currentFile?.name);
   });
+
+  const handleTimeRangeChange = (range: TimeRange) => {
+    setTimeRange(range);
+    console.log('[StatusPage] 切换时间范围:', range);
+  };
 
   // 统计数据 - 根据当前文件的成员状态计算
   const statusStats = useMemo(() => ({
@@ -143,6 +159,21 @@ const StatusPage: React.FC = () => {
             <Text className={styles.changeBtn}>切换 ›</Text>
           </View>
         </View>
+
+        {/* 时间范围筛选器 */}
+        <View className={styles.timeFilter}>
+          <ScrollView scrollX className={styles.timeFilterScroll}>
+            {TIME_RANGE_OPTIONS.map(option => (
+              <View
+                key={option.key}
+                className={classnames(styles.timeFilterItem, timeRange === option.key && styles.timeFilterActive)}
+                onClick={() => handleTimeRangeChange(option.key)}
+              >
+                {option.label}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       </View>
 
       <View className={styles.statsRow}>
@@ -196,7 +227,9 @@ const StatusPage: React.FC = () => {
             <Text className={styles.sectionTitle}>
               {filterStatus === 'all' ? '全部成员' : getStatusText(filterStatus)}
             </Text>
-            <Text className={styles.sectionCount}>{filteredMembers.length} 人</Text>
+            <Text className={styles.sectionCount}>
+              {filteredMembers.length} 人{timeRange !== 'all' && ` · ${TIME_RANGE_OPTIONS.find(o => o.key === timeRange)?.label}`}
+            </Text>
           </View>
 
           <View className={styles.memberGrid}>

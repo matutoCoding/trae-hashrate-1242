@@ -95,3 +95,77 @@ export const calcPercentage = (part: number, total: number): number => {
   if (total === 0) return 0;
   return Math.round((part / total) * 100);
 };
+
+// 时间范围配置
+export const TIME_RANGE_OPTIONS = [
+  { key: '24h' as const, label: '最近24小时' },
+  { key: '7d' as const, label: '最近7天' },
+  { key: 'all' as const, label: '全部记录' }
+];
+
+// 获取时间范围的起始时间
+export const getTimeRangeStart = (range: string): Date | null => {
+  const now = new Date();
+  switch (range) {
+    case '24h':
+      return new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    case '7d':
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    case 'all':
+    default:
+      return null;
+  }
+};
+
+// 检查时间是否在范围内
+export const isTimeInRange = (time: string | undefined, range: string): boolean => {
+  if (!time) return false;
+  const startTime = getTimeRangeStart(range);
+  if (!startTime) return true; // 全部记录
+  return new Date(time) >= startTime;
+};
+
+// 检查成员在指定时间范围内是否有访问
+export const getMemberStatusInRange = (
+  memberStatus: {
+    lastVisitTime?: string;
+    visitCount: number;
+    previewCount: number;
+    downloadCount: number;
+  },
+  logsInRange: { action: string }[]
+): {
+  visitStatus: 'viewed' | 'previewed' | 'downloaded' | 'unvisited';
+  visitCount: number;
+  previewCount: number;
+  downloadCount: number;
+} => {
+  // 根据范围内的日志重新计算
+  let visitCount = 0;
+  let previewCount = 0;
+  let downloadCount = 0;
+
+  logsInRange.forEach(log => {
+    if (log.action === 'view') visitCount++;
+    else if (log.action === 'preview') previewCount++;
+    else if (log.action === 'download') downloadCount++;
+  });
+
+  // 确定状态
+  let visitStatus: 'viewed' | 'previewed' | 'downloaded' | 'unvisited';
+  if (downloadCount > 0) visitStatus = 'downloaded';
+  else if (visitCount > 0) visitStatus = 'viewed';
+  else if (previewCount > 0) visitStatus = 'previewed';
+  else visitStatus = 'unvisited';
+
+  return { visitStatus, visitCount, previewCount, downloadCount };
+};
+
+// 计算最后一次访问距离现在的天数
+export const getDaysSinceLastVisit = (lastVisitTime: string | undefined): number => {
+  if (!lastVisitTime) return Infinity;
+  const now = new Date();
+  const last = new Date(lastVisitTime);
+  const diffMs = now.getTime() - last.getTime();
+  return Math.floor(diffMs / (24 * 60 * 60 * 1000));
+};

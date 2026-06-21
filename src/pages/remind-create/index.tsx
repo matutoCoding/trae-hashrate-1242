@@ -4,8 +4,8 @@ import Taro, { useRouter } from '@tarojs/taro';
 import styles from './index.module.scss';
 import classnames from 'classnames';
 import { useAppStore } from '@/store';
-import { generateReminderText, getStatusText } from '@/utils';
-import type { FileItem, Member, VisitStatus } from '@/types';
+import { generateReminderText, getStatusText, TIME_RANGE_OPTIONS } from '@/utils';
+import type { FileItem, Member, VisitStatus, TimeRange } from '@/types';
 
 interface MemberWithStatus extends Member {
   visitStatus: VisitStatus;
@@ -19,10 +19,11 @@ interface MemberWithStatus extends Member {
 const RemindCreatePage: React.FC = () => {
   const router = useRouter();
   const fileId = router.params.fileId || 'file1';
+  const timeRangeParam = (router.params.timeRange || 'all') as TimeRange;
 
   const getFileById = useAppStore(state => state.getFileById);
   const getMembersForReminder = useAppStore(state => state.getMembersForReminder);
-  const getMembersByFileId = useAppStore(state => state.getMembersByFileId);
+  const getMembersByFileIdAndTimeRange = useAppStore(state => state.getMembersByFileIdAndTimeRange);
   const addReminder = useAppStore(state => state.addReminder);
 
   const [file, setFile] = useState<FileItem | null>(null);
@@ -30,37 +31,41 @@ const RemindCreatePage: React.FC = () => {
   const [customMessage, setCustomMessage] = useState('');
   const [includeNotVisitedForDays, setIncludeNotVisitedForDays] = useState<number | null>(null);
 
-  // 未访问成员
-  const unvisitedMembers = useMemo(() => {
-    return getMembersForReminder(fileId, { includeUnvisited: true }) as MemberWithStatus[];
-  }, [fileId]);
+  const timeRangeLabel = TIME_RANGE_OPTIONS.find(o => o.key === timeRangeParam)?.label;
 
-  // 超过指定天数未访问的成员（已访问但很久没看）
+  // 未访问成员（按传入的时间范围筛选）
+  const unvisitedMembers = useMemo(() => {
+    return getMembersForReminder(fileId, { includeUnvisited: true, timeRange: timeRangeParam }) as MemberWithStatus[];
+  }, [fileId, timeRangeParam]);
+
+  // 超过指定天数未访问的成员（按传入的时间范围筛选）
   const longNotVisitedMembers = useMemo(() => {
     if (includeNotVisitedForDays === null) return [];
     return getMembersForReminder(fileId, {
       includeUnvisited: false,
-      includeNotVisitedForDays
+      includeNotVisitedForDays,
+      timeRange: timeRangeParam
     }) as MemberWithStatus[];
-  }, [fileId, includeNotVisitedForDays]);
+  }, [fileId, includeNotVisitedForDays, timeRangeParam]);
 
   // 所有可选成员（未访问 + 超过N天未访问）
   const selectableMembers = useMemo(() => {
     return [...unvisitedMembers, ...longNotVisitedMembers];
   }, [unvisitedMembers, longNotVisitedMembers]);
 
-  // 所有成员（用于显示已查看的信息）
+  // 所有成员（按时间范围筛选，用于显示已查看的信息）
   const allMembersForFile = useMemo(() => {
-    return getMembersByFileId(fileId) as MemberWithStatus[];
-  }, [fileId]);
+    return getMembersByFileIdAndTimeRange(fileId, timeRangeParam) as MemberWithStatus[];
+  }, [fileId, timeRangeParam]);
 
-  // 成员最后一次访问超过3天的可选项
+  // 成员最后一次访问超过3天的可选项（按传入的时间范围筛选）
   const longNotVisitedOptionMembers = useMemo(() => {
     return getMembersForReminder(fileId, {
       includeUnvisited: false,
-      includeNotVisitedForDays: 3
+      includeNotVisitedForDays: 3,
+      timeRange: timeRangeParam
     }) as MemberWithStatus[];
-  }, [fileId]);
+  }, [fileId, timeRangeParam]);
 
   useEffect(() => {
     const fileData = getFileById(fileId);
@@ -249,6 +254,11 @@ const RemindCreatePage: React.FC = () => {
         <View className={styles.fileSection}>
           <Text className={styles.fileLabel}>提醒文件</Text>
           <Text className={styles.fileName}>{file?.name || '加载中...'}</Text>
+          {timeRangeParam !== 'all' && (
+            <Text style={{ fontSize: '24rpx', color: '#86909C', marginTop: '4rpx' }}>
+              筛选口径：{timeRangeLabel}
+            </Text>
+          )}
         </View>
 
         {showLongNotVisitedOption && (

@@ -10,6 +10,7 @@ import type { FileItem, VisitLog, Member, VisitStatus, TimeRange } from '@/types
 interface MemberWithStatus extends Member {
   visitStatus: VisitStatus;
   lastVisitTime?: string;
+  lastVisitTimeInRange?: string;
   visitCount: number;
   previewCount: number;
   downloadCount: number;
@@ -69,7 +70,7 @@ const FileDetailPage: React.FC = () => {
   const handleRemind = () => {
     if (statsInRange.unvisited > 0) {
       Taro.navigateTo({
-        url: `/pages/remind-create/index?fileId=${fileId}`
+        url: `/pages/remind-create/index?fileId=${fileId}&timeRange=${timeRange}`
       });
     } else {
       Taro.showToast({ title: '全员已查看，无需提醒', icon: 'none' });

@@ -10,6 +10,7 @@ import type { Member, VisitStatus, FileItem, TimeRange } from '@/types';
 interface MemberWithStatus extends Member {
   visitStatus: VisitStatus;
   lastVisitTime?: string;
+  lastVisitTimeInRange?: string;
   visitCount: number;
   previewCount: number;
   downloadCount: number;
@@ -100,33 +101,39 @@ const StatusPage: React.FC = () => {
     if (!currentFile) return;
     if (unvisitedMembers.length > 0) {
       Taro.navigateTo({
-        url: `/pages/remind-create/index?fileId=${currentFile.id}`
+        url: `/pages/remind-create/index?fileId=${currentFile.id}&timeRange=${timeRange}`
       });
     } else {
       Taro.showToast({ title: '全员已查看，无需提醒', icon: 'none' });
     }
   };
 
-  const renderMemberCard = (member: MemberWithStatus) => (
-    <View
-      key={member.id}
-      className={styles.memberItem}
-      onClick={() => handleMemberClick(member.id)}
-    >
-      <View className={styles.memberAvatarWrap}>
-        <Image
-          className={styles.memberAvatar}
-          src={member.avatar}
-          mode="aspectFill"
-        />
-        <View className={classnames(styles.statusRing, styles[member.visitStatus])} />
+  const renderMemberCard = (member: MemberWithStatus) => {
+    const displayTime = timeRange !== 'all'
+      ? (member.lastVisitTimeInRange ? formatRelativeTime(member.lastVisitTimeInRange) : '—')
+      : (member.lastVisitTime ? formatRelativeTime(member.lastVisitTime) : '—');
+
+    return (
+      <View
+        key={member.id}
+        className={styles.memberItem}
+        onClick={() => handleMemberClick(member.id)}
+      >
+        <View className={styles.memberAvatarWrap}>
+          <Image
+            className={styles.memberAvatar}
+            src={member.avatar}
+            mode="aspectFill"
+          />
+          <View className={classnames(styles.statusRing, styles[member.visitStatus])} />
+        </View>
+        <Text className={styles.memberName}>{member.name}</Text>
+        <Text className={styles.memberTime}>
+          {displayTime}
+        </Text>
       </View>
-      <Text className={styles.memberName}>{member.name}</Text>
-      <Text className={styles.memberTime}>
-        {member.lastVisitTime ? formatRelativeTime(member.lastVisitTime) : '—'}
-      </Text>
-    </View>
-  );
+    );
+  };
 
   const statusFilters: { key: VisitStatus | 'all'; label: string }[] = [
     { key: 'all', label: '全部' },

@@ -55,8 +55,8 @@ interface AppState {
 
   // 按时间范围筛选的方法
   getVisitLogsByFileIdAndTimeRange: (fileId: string, timeRange: TimeRange) => VisitLog[];
-  getMembersByFileIdAndTimeRange: (fileId: string, timeRange: TimeRange) => (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
-  getMembersForReminder: (fileId: string, options?: { includeUnvisited?: boolean; includeNotVisitedForDays?: number }) => (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
+  getMembersByFileIdAndTimeRange: (fileId: string, timeRange: TimeRange) => (Member & FileMemberStatus & { daysSinceLastVisit: number; lastVisitTimeInRange?: string })[];
+  getMembersForReminder: (fileId: string, options?: { includeUnvisited?: boolean; includeNotVisitedForDays?: number; timeRange?: TimeRange }) => (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
   getReminderById: (reminderId: string) => ReminderRecord | undefined;
 }
 
@@ -320,34 +320,64 @@ export const useAppStore = create<AppState>()(
             const member = state.allMembers.find(m => m.id === status.memberId);
             if (!member) return null;
 
-            // 筛选该成员在时间范围内的日志
             const memberLogsInRange = allLogs.filter(
               log => log.memberId === status.memberId && isTimeInRange(log.time, timeRange)
             );
 
-            // 根据范围内的日志重新计算状态
             const statusInRange = getMemberStatusInRange(status, memberLogsInRange);
 
-            // 计算最后一次访问距离现在的天数
             const daysSinceLastVisit = getDaysSinceLastVisit(status.lastVisitTime);
+
+            let lastVisitTimeInRange: string | undefined;
+            if (timeRange !== 'all' && memberLogsInRange.length > 0) {
+              const sorted = [...memberLogsInRange].sort(
+                (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+              );
+              lastVisitTimeInRange = sorted[0].time;
+            }
 
             return {
               ...member,
               ...status,
               ...statusInRange,
-              // 保留原始的最后访问时间用于显示
               lastVisitTime: status.lastVisitTime,
+              lastVisitTimeInRange,
               daysSinceLastVisit
             };
           })
-          .filter(Boolean) as (Member & FileMemberStatus & { daysSinceLastVisit: number })[];
+          .filter(Boolean) as (Member & FileMemberStatus & { daysSinceLastVisit: number; lastVisitTimeInRange?: string })[];
       },
 
-      // 获取提醒对象（支持未访问和超过N天未访问双维度筛选）
+      // 获取提醒对象（支持未访问和超过N天未访问双维度筛选，支持按时间范围）
       getMembersForReminder: (fileId, options = {}) => {
-        const { includeUnvisited = true, includeNotVisitedForDays } = options;
+        const { includeUnvisited = true, includeNotVisitedForDays, timeRange } = options;
         const state = get();
-        const memberStatuses = state.fileMembersStatus[fileId] || [];
+
+        let memberStatuses = state.fileMembersStatus[fileId] || [];
+        let allLogs = state.fileVisitLogs[fileId] || [];
+
+        if (timeRange && timeRange !== 'all') {
+          allLogs = allLogs.filter(log => isTimeInRange(log.time, timeRange));
+
+          memberStatuses = memberStatuses.map(status => {
+            const memberLogsInRange = allLogs.filter(
+              log => log.memberId === status.memberId
+            );
+            const statusInRange = getMemberStatusInRange(status, memberLogsInRange);
+            let rangeLastVisit: string | undefined;
+            if (memberLogsInRange.length > 0) {
+              const sorted = [...memberLogsInRange].sort(
+                (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+              );
+              rangeLastVisit = sorted[0].time;
+            }
+            return {
+              ...status,
+              ...statusInRange,
+              lastVisitTime: rangeLastVisit || undefined
+            };
+          });
+        }
 
         return memberStatuses
           .map(status => {
@@ -356,15 +386,12 @@ export const useAppStore = create<AppState>()(
 
             const daysSinceLastVisit = getDaysSinceLastVisit(status.lastVisitTime);
 
-            // 判断是否符合筛选条件
             let shouldInclude = false;
 
-            // 未访问的成员
             if (includeUnvisited && status.visitStatus === 'unvisited') {
               shouldInclude = true;
             }
 
-            // 超过指定天数未访问的成员（即使已经访问过）
             if (includeNotVisitedForDays !== undefined && status.visitStatus !== 'unvisited') {
               if (daysSinceLastVisit >= includeNotVisitedForDays) {
                 shouldInclude = true;
@@ -393,7 +420,54 @@ export const useAppStore = create<AppState>()(
         reminders: state.reminders,
         fileMembersStatus: state.fileMembersStatus,
         fileVisitLogs: state.fileVisitLogs
-      })
+      }),
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<AppState>;
+        if (!saved) return current;
+
+        const freshStatus = initFileMembersStatus();
+        const freshLogs = initFileVisitLogs();
+
+        const correctedStatus: FileMembersStatus = {};
+        const correctedLogs: FileVisitLogs = {};
+
+        const allFileIds = new Set([
+          ...Object.keys(freshStatus),
+          ...(saved.fileMembersStatus ? Object.keys(saved.fileMembersStatus) : [])
+        ]);
+
+        allFileIds.forEach(fileId => {
+          const freshFileStatus = freshStatus[fileId];
+          const savedFileStatus = saved.fileMembersStatus?.[fileId];
+
+          if (freshFileStatus) {
+            const freshUnvisited = freshFileStatus.filter(s => s.visitStatus === 'unvisited').length;
+            if (savedFileStatus) {
+              const savedUnvisited = savedFileStatus.filter(s => s.visitStatus === 'unvisited').length;
+              if (freshUnvisited === 0 && savedUnvisited > 0) {
+                correctedStatus[fileId] = freshFileStatus;
+                correctedLogs[fileId] = freshLogs[fileId] || [];
+              } else {
+                correctedStatus[fileId] = savedFileStatus;
+                correctedLogs[fileId] = saved.fileVisitLogs?.[fileId] || freshLogs[fileId] || [];
+              }
+            } else {
+              correctedStatus[fileId] = freshFileStatus;
+              correctedLogs[fileId] = freshLogs[fileId] || [];
+            }
+          } else if (savedFileStatus) {
+            correctedStatus[fileId] = savedFileStatus;
+            correctedLogs[fileId] = saved.fileVisitLogs?.[fileId] || [];
+          }
+        });
+
+        return {
+          ...current,
+          reminders: saved.reminders || current.reminders,
+          fileMembersStatus: { ...current.fileMembersStatus, ...correctedStatus },
+          fileVisitLogs: { ...current.fileVisitLogs, ...correctedLogs }
+        };
+      }
     }
   )
 );

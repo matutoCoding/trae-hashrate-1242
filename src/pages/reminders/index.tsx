@@ -1,24 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import classnames from 'classnames';
-import { mockReminders } from '@/data/reminders';
+import { useAppStore } from '@/store';
 import ReminderCard from '@/components/ReminderCard';
 import type { ReminderRecord } from '@/types';
 
 const RemindersPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'partial'>('all');
 
-  const stats = {
-    total: mockReminders.length,
-    completed: mockReminders.filter(r => r.status === 'completed').length,
-    pending: mockReminders.filter(r => r.status === 'pending' || r.status === 'partial').length
-  };
+  // 从 store 中获取提醒记录（自动从 localStorage 恢复）
+  const reminders = useAppStore(state => state.reminders);
 
-  const filteredReminders: ReminderRecord[] = filterStatus === 'all'
-    ? mockReminders
-    : mockReminders.filter(r => r.status === filterStatus);
+  // 每次页面显示时刷新（确保发送提醒后返回能看到最新数据）
+  useDidShow(() => {
+    console.log('[RemindersPage] 页面显示，当前提醒数:', reminders.length);
+  });
+
+  // 计算统计数据
+  const stats = useMemo(() => ({
+    total: reminders.length,
+    completed: reminders.filter(r => r.status === 'completed').length,
+    pending: reminders.filter(r => r.status === 'pending' || r.status === 'partial').length
+  }), [reminders]);
+
+  // 过滤提醒记录
+  const filteredReminders: ReminderRecord[] = useMemo(() => {
+    if (filterStatus === 'all') {
+      return reminders;
+    }
+    return reminders.filter(r => r.status === filterStatus);
+  }, [reminders, filterStatus]);
 
   const filters = [
     { key: 'all' as const, label: '全部' },

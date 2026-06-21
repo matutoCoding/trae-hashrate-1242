@@ -1,26 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, Input, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import classnames from 'classnames';
-import { mockFolders, mockFiles, getFilesByFolderId } from '@/data/files';
+import { useAppStore } from '@/store';
 import FileCard from '@/components/FileCard';
 import type { FolderItem, FileItem } from '@/types';
 
 const FilesPage: React.FC = () => {
+  const folders = useAppStore(state => state.folders);
+  const files = useAppStore(state => state.files);
+  const setCurrentFile = useAppStore(state => state.setCurrentFile);
+
   const [activeTab, setActiveTab] = useState<'folders' | 'files'>('folders');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
 
-  const filteredFolders: FolderItem[] = mockFolders.filter(folder =>
-    folder.name.includes(searchText)
-  );
+  useDidShow(() => {
+    console.log('[FilesPage] 页面显示');
+  });
 
-  const displayFiles: FileItem[] = selectedFolderId
-    ? getFilesByFolderId(selectedFolderId).filter(f =>
-        f.name.includes(searchText)
-      )
-    : mockFiles.filter(f => f.name.includes(searchText));
+  const filteredFolders: FolderItem[] = useMemo(() => {
+    return folders.filter(folder =>
+      folder.name.toLowerCase().includes(searchText.toLowerCase())
+    );
+  }, [folders, searchText]);
+
+  const displayFiles: FileItem[] = useMemo(() => {
+    let fileList = selectedFolderId
+      ? files.filter(f => f.folderId === selectedFolderId)
+      : files;
+
+    if (searchText) {
+      fileList = fileList.filter(f =>
+        f.name.toLowerCase().includes(searchText.toLowerCase())
+      );
+    }
+
+    return fileList;
+  }, [files, selectedFolderId, searchText]);
 
   const handleFolderClick = (folderId: string) => {
     setSelectedFolderId(folderId);
@@ -30,6 +48,15 @@ const FilesPage: React.FC = () => {
   const handleBackToFolders = () => {
     setSelectedFolderId(null);
     setActiveTab('folders');
+  };
+
+  const handleFileClick = (file: FileItem) => {
+    // 点击文件时更新全局 currentFileId
+    setCurrentFile(file.id);
+    console.log('[FilesPage] 选择文件:', file.name);
+    Taro.navigateTo({
+      url: `/pages/file-detail/index?id=${file.id}`
+    });
   };
 
   return (
@@ -67,64 +94,68 @@ const FilesPage: React.FC = () => {
       <ScrollView scrollY className={styles.content}>
         <View className={styles.section}>
           {activeTab === 'folders' ? (
-          <>
-            <Text className={styles.sectionTitle}>共享文件夹</Text>
-            <View className={styles.folderList}>
-              {filteredFolders.length > 0 ? (
-                filteredFolders.map(folder => (
-                  <View
-                    key={folder.id}
-                    className={styles.folderCard}
-                    onClick={() => handleFolderClick(folder.id)}
-                  >
-                    <View className={styles.folderIcon}>
-                      <Text className={styles.folderIconText}>📁</Text>
-                    </View>
-                    <View className={styles.folderInfo}>
-                      <Text className={styles.folderName}>{folder.name}</Text>
-                      <View className={styles.folderMeta}>
-                        <Text className={styles.folderCount}>{folder.fileCount} 个文件</Text>
-                        <Text className={styles.folderDrive}>{folder.cloudDrive}</Text>
+            <>
+              <Text className={styles.sectionTitle}>共享文件夹</Text>
+              <View className={styles.folderList}>
+                {filteredFolders.length > 0 ? (
+                  filteredFolders.map(folder => (
+                    <View
+                      key={folder.id}
+                      className={styles.folderCard}
+                      onClick={() => handleFolderClick(folder.id)}
+                    >
+                      <View className={styles.folderIcon}>
+                        <Text className={styles.folderIconText}>📁</Text>
                       </View>
+                      <View className={styles.folderInfo}>
+                        <Text className={styles.folderName}>{folder.name}</Text>
+                        <View className={styles.folderMeta}>
+                          <Text className={styles.folderCount}>{folder.fileCount} 个文件</Text>
+                          <Text className={styles.folderDrive}>{folder.cloudDrive}</Text>
+                        </View>
+                      </View>
+                      <Text className={styles.folderArrow}>›</Text>
                     </View>
-                    <Text className={styles.folderArrow}>›</Text>
+                  ))
+                ) : (
+                  <View className={styles.emptyState}>
+                    <Text className={styles.emptyIcon}>📭</Text>
+                    <Text className={styles.emptyText}>暂无匹配的文件夹</Text>
                   </View>
-                ))
-              ) : (
-                <View className={styles.emptyState}>
-                  <Text className={styles.emptyIcon}>📭</Text>
-                  <Text className={styles.emptyText}>暂无匹配的文件夹</Text>
+                )}
+              </View>
+            </>
+          ) : (
+            <>
+              {selectedFolderId && (
+                <View
+                  style={{ marginBottom: '24rpx', color: '#3370FF', fontSize: '28rpx', fontWeight: '500' }}
+                  onClick={handleBackToFolders}
+                >
+                  ← 返回文件夹列表
                 </View>
               )}
-            </View>
-          </>
-        ) : (
-          <>
-            {selectedFolderId && (
-            <View
-              style={{ marginBottom: '24rpx', color: '#3370FF', fontSize: '28rpx', fontWeight: '500' }}
-              onClick={handleBackToFolders}
-            >
-              ← 返回文件夹列表
-            </View>
+              <Text className={styles.sectionTitle}>
+                {selectedFolderId ? '文件夹内文件' : '全部文件'}
+              </Text>
+              <View className={styles.fileList}>
+                {displayFiles.length > 0 ? (
+                  displayFiles.map(file => (
+                    <FileCard
+                      key={file.id}
+                      file={file}
+                      onClick={() => handleFileClick(file)}
+                    />
+                  ))
+                ) : (
+                  <View className={styles.emptyState}>
+                    <Text className={styles.emptyIcon}>📄</Text>
+                    <Text className={styles.emptyText}>暂无文件</Text>
+                  </View>
+                )}
+              </View>
+            </>
           )}
-            <Text className={styles.sectionTitle}>
-              {selectedFolderId ? '文件夹内文件' : '全部文件'}
-            </Text>
-            <View className={styles.fileList}>
-              {displayFiles.length > 0 ? (
-                displayFiles.map(file => (
-                  <FileCard key={file.id} file={file} />
-                ))
-              ) : (
-                <View className={styles.emptyState}>
-                  <Text className={styles.emptyIcon}>📄</Text>
-                  <Text className={styles.emptyText}>暂无文件</Text>
-                </View>
-              )}
-            </View>
-          </>
-        )}
         </View>
       </ScrollView>
     </View>
